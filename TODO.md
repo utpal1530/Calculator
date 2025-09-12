@@ -1,0 +1,3 @@
+- [x] Analyze calculator code and plan keyboard support
+- [x] Add keydown event listener to script.js
+- [ ] Test keyboard functionality in browser
