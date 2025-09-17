@@ -114,9 +114,28 @@ body {
     color: #fff;
     padding: 20px;
     box-sizing: border-box;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-x: auto;
     white-space: nowrap;
+    position: relative;
+}
+
+.mic-icon {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 24px;
+    opacity: 0.1;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.mic-icon:hover {
+    opacity: 0.3;
+}
+
+.mic-icon.listening {
+    opacity: 0.5;
+    color: #ff9500;
 }
 
 .buttons {
@@ -127,6 +146,18 @@ body {
     gap: 8px;
     padding: 15px;
     box-sizing: border-box;
+}
+
+.credit-text {
+    text-align: center;
+    color: white;
+    font-size: 14px;
+    margin-top: 10px;
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.red-heart {
+    color: red;
 }
 
 .btn {

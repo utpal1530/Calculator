@@ -1,4 +1,3 @@
-let display = document.getElementById('display');
 let currentInput = '0';
 let previousInput = '';
 let operator = '';
@@ -7,7 +6,153 @@ let waitingForOperand = false;
 const timeElement = document.getElementById('time');
 
 function updateDisplay() {
-    display.textContent = currentInput;
+    document.getElementById('display-text').textContent = currentInput;
+}
+
+// Voice recognition setup with Gemini API
+const micButton = document.getElementById('mic-icon');
+let mediaRecorder;
+let audioChunks = [];
+let isRecording = false;
+let isProcessing = false;
+const GEMINI_API_KEY = 'AIzaSyDBUzXpRgeaRlHuM0KYrOlTA4vwtu68p50';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+micButton.addEventListener('click', async () => {
+    if (isProcessing || isRecording) return; // Prevent multiple clicks
+    await startRecording();
+});
+
+
+
+async function startRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            isProcessing = true;
+            await processAudioWithGemini(audioBlob);
+            isProcessing = false;
+            // Stop all tracks to release the microphone
+            stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        micButton.classList.add('listening');
+
+        // Auto-stop after 3 seconds
+        setTimeout(() => {
+            if (isRecording) {
+                stopRecording();
+            }
+        }, 3000);
+    } catch (error) {
+        console.error('Error starting recording:', error);
+        alert('Microphone access denied or not available.');
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        isRecording = false;
+        micButton.classList.remove('listening');
+    }
+}
+
+async function processAudioWithGemini(audioBlob) {
+    try {
+        // Convert blob to base64
+        const base64Audio = await blobToBase64(audioBlob);
+
+        const requestBody = {
+            contents: [
+                {
+                    parts: [
+                        {
+                            text: "Parse the spoken calculator commands from this audio and return only the sequence of calculator operations as a space-separated string (e.g., '5 + 3 ='). Supported operations: digits 0-9, +, -, *, /, =, AC, +/-, %, ."
+                        },
+                        {
+                            inline_data: {
+                                mime_type: "audio/wav",
+                                data: base64Audio
+                            }
+                        }
+                    ]
+                }
+            ]
+        };
+
+        const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            throw new Error(`API request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const generatedText = data.candidates[0].content.parts[0].text.trim();
+        console.log('Gemini response:', generatedText);
+
+        // Parse the response and simulate button presses
+        processGeminiResponse(generatedText);
+
+    } catch (error) {
+        console.error('Error processing audio with Gemini:', error);
+        alert('Error processing voice command. Please try again.');
+    }
+}
+
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+function processGeminiResponse(responseText) {
+    // Clean and split the response
+    const cleanedResponse = responseText.replace(/[^0-9+\-*/=AC.%\s]/g, '').trim();
+    const tokens = cleanedResponse.split(/\s+/);
+
+    // Map of possible inputs
+    const validInputs = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '*', '/', '=', 'AC', '+/-', '%', '.'];
+
+    tokens.forEach(token => {
+        if (validInputs.includes(token)) {
+            const button = document.querySelector(`button[data-value="${token}"]`);
+            if (button) {
+                button.click();
+            } else {
+                console.log('Unrecognized token:', token);
+            }
+        } else if (/^\d+$/.test(token)) {
+            // Multi-digit number, input each digit
+            for (let digit of token) {
+                inputNumber(digit);
+            }
+        } else {
+            console.log('Invalid token:', token);
+        }
+    });
 }
 
 function inputNumber(num) {
